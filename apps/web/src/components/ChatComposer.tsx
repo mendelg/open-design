@@ -309,6 +309,13 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
               data-testid="chat-file-input"
               type="file"
               multiple
+              // Chromium/WebKit directory picker support. When a folder is
+              // selected, each File carries webkitRelativePath so we can keep
+              // nested structure on upload.
+              {...({
+                webkitdirectory: "",
+                directory: "",
+              } as React.InputHTMLAttributes<HTMLInputElement>)}
               style={{ display: "none" }}
               onChange={(e) => {
                 const files = Array.from(e.target.files ?? []);

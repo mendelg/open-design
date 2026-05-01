@@ -386,7 +386,11 @@ export async function uploadProjectFiles(
     const batch = files.slice(i, i + PROJECT_UPLOAD_BATCH_SIZE);
     const remaining = files.slice(i + PROJECT_UPLOAD_BATCH_SIZE);
     const form = new FormData();
-    for (const f of batch) form.append('files', f);
+    for (const f of batch) {
+      form.append('files', f);
+      const relativePath = f.webkitRelativePath?.trim();
+      form.append('relativePaths', relativePath && relativePath.length > 0 ? relativePath : f.name);
+    }
 
     try {
       const resp = await fetch(

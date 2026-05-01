@@ -48,6 +48,7 @@ import {
   projectDir,
   readProjectFile,
   removeProjectDir,
+  sanitizePath,
   sanitizeName,
   writeProjectFile,
 } from './projects.js';
@@ -1524,19 +1525,33 @@ export async function startServer({ port = 7456, returnServer = false } = {}) {
   // Files land flat in the project folder; the response carries the same
   // metadata as listFiles so the client can stage them as ChatAttachments
   // without a separate refetch.
-  app.post(
+app.post(
     '/api/projects/:id/upload',
     handleProjectUpload,
     async (req, res) => {
       try {
         const incoming = Array.isArray(req.files) ? req.files : [];
+        const requestedRelativePaths = Array.isArray(req.body?.relativePaths)
+          ? req.body.relativePaths
+          : typeof req.body?.relativePaths === 'string'
+            ? [req.body.relativePaths]
+            : [];
+        const projectRoot = await ensureProject(PROJECTS_DIR, req.params.id);
         const out = [];
-        for (const f of incoming) {
+        for (let i = 0; i < incoming.length; i += 1) {
+          const f = incoming[i];
           try {
-            const stat = await fs.promises.stat(f.path);
+            const requestedPath = decodeMultipartFilename(requestedRelativePaths[i] ?? f.originalname ?? f.filename);
+            const fallbackName = decodeMultipartFilename(f.originalname ?? f.filename);
+            const safePath = deriveUploadPath(requestedPath, fallbackName);
+            const targetPath = await allocateProjectUploadPath(projectRoot, safePath);
+            await fs.promises.mkdir(path.dirname(targetPath), { recursive: true });
+            await fs.promises.rename(f.path, targetPath);
+            const stat = await fs.promises.stat(targetPath);
+            const relPath = path.relative(projectRoot, targetPath).split(path.sep).join('/');
             out.push({
-              name: f.filename,
-              path: f.filename,
+              name: relPath,
+              path: relPath,
               size: stat.size,
               mtime: stat.mtimeMs,
               originalName: f.originalname,
@@ -1553,6 +1568,33 @@ export async function startServer({ port = 7456, returnServer = false } = {}) {
       }
     },
   );
+
+function deriveUploadPath(rawPath, fallbackName) {
+  const source = typeof rawPath === 'string' && rawPath.trim().length > 0
+    ? rawPath
+    : fallbackName;
+  try {
+    return sanitizePath(source);
+  } catch {
+    return sanitizeName(fallbackName);
+  }
+}
+
+async function allocateProjectUploadPath(projectRoot, safePath) {
+  const ext = path.extname(safePath);
+  const baseName = ext ? safePath.slice(0, -ext.length) : safePath;
+  for (let n = 0; n < 500; n += 1) {
+    const candidate = n === 0 ? safePath : `${baseName}-${n}${ext}`;
+    const fullPath = path.join(projectRoot, candidate);
+    try {
+      await fs.promises.access(fullPath);
+    } catch (err) {
+      if (err && err.code === 'ENOENT') return fullPath;
+      throw err;
+    }
+  }
+  throw new Error('failed to allocate upload path');
+}
 
   const design = {
     runs: createChatRunService({ createSseResponse, createSseErrorPayload }),
