@@ -414,6 +414,10 @@ export function FileWorkspace({
         ref={fileInputRef}
         type="file"
         multiple
+        {...({
+          webkitdirectory: '',
+          directory: '',
+        } as React.InputHTMLAttributes<HTMLInputElement>)}
         data-testid="design-files-upload-input"
         style={{ display: 'none' }}
         onChange={handleFilePicked}

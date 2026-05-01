@@ -652,7 +652,9 @@ async function runFileUploadSendFlow(
 async function runDesignFilesUploadFlow(
   page: Parameters<typeof test>[0]['page'],
 ) {
-  await page.getByTestId('design-files-upload-input').setInputFiles({
+  const designUploadInput = page.getByTestId('design-files-upload-input');
+  await expect(designUploadInput).toHaveAttribute('webkitdirectory', '');
+  await designUploadInput.setInputFiles({
     name: 'moodboard.png',
     mimeType: 'image/png',
     buffer: Buffer.from(
