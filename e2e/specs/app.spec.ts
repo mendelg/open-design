@@ -625,11 +625,13 @@ async function runFileUploadSendFlow(
   page: Parameters<typeof test>[0]['page'],
   entry: UICase,
 ) {
+  const fileInput = page.getByTestId('chat-file-input');
+  await expect(fileInput).toHaveAttribute('webkitdirectory', '');
   const uploadResponse = page.waitForResponse(
     (resp) => resp.url().includes('/upload') && resp.request().method() === 'POST',
     { timeout: 5000 },
   );
-  await page.getByTestId('chat-file-input').setInputFiles({
+  await fileInput.setInputFiles({
     name: 'reference.txt',
     mimeType: 'text/plain',
     buffer: Buffer.from('Reference content for upload flow.\n', 'utf8'),
